@@ -1,0 +1,45 @@
+name: Cloud iOS IPA Build Engine
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: # Allows manual trigger directly from the GitHub Actions UI tab
+
+jobs:
+  build-ipa:
+    runs-on: macos-14 # Targets standard Cloud Mac nodes equipped with modern Xcode engines
+    
+    steps:
+    - name: Checkout Source Tree
+      uses: actions/checkout@v4
+
+    - name: Initialize Dummy Compilation Structure
+      run: |
+        mkdir -p build/xiCode.app
+        echo "[*] Setting up workspace directory mappings..."
+
+    - name: Run Swift Application Compiler
+      run: |
+        xcrun -sdk iphoneos swiftc \
+          -target arm64-apple-ios15.0 \
+          -o build/xiCode.app/xiCode \
+          xiCode/App.swift xiCode/ContentView.swift
+
+    - name: Merge Application Attributes Configuration Matrix
+      run: |
+        cp xiCode/Info.plist build/xiCode.app/Info.plist
+
+    - name: Package Application Binary Matrix to Payload Container
+      run: |
+        mkdir -p Payload
+        cp -r build/xiCode.app Payload/
+        zip -r xiCode.ipa Payload
+        echo "[+] Compiled artifact package created successfully."
+
+    - name: Deploy Compiled Binary Asset to GitHub Releases
+      uses: softprops/action-gh-release@v2
+      if: startsWith(github.ref, 'refs/tags/') # Triggers asset deployment automatically when git tags are declared
+      with:
+        files: xiCode.ipa
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
