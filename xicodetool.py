@@ -58,10 +58,11 @@ class XiCodeInstaller:
             print("     ⚠️  MISSING DEPENDENCIES DETECTED  ⚠️")
             print("==================================================")
             print("The following utilities are required to deploy to your iPhone:")
-            for item in missing_list:
+            for item in missing: # Fixed: changed from missing_list to missing
                 print(f"  ❌ {item}")
             print("-" * 50)
-            print(f"[!] Please run MSYS2 UCRT64 and install tools via pacman.")
+            print(f"[!] Please ensure MSYS2 is installed and tools are in: {MSYS2_BIN}")
+            print("[!] Or add the folder containing these .exe files to your PATH.")
             return False
         
         print("[+] Environment check successful! All tools are ready.")
@@ -71,6 +72,7 @@ class XiCodeInstaller:
         """Verifies an iOS device is connected and trusted over USB."""
         print("[*] Establishing handshakes with iOS device over USB...")
         try:
+            # Use self.idevice_id which contains the full path
             result = subprocess.run([self.idevice_id, "-l"], capture_output=True, text=True, check=True)
             udid = result.stdout.strip()
             if not udid:
@@ -160,39 +162,36 @@ def main():
     # --- Interactive Wizard Interface ---
     if not args.ipa:
         print("\n[💡] Missing IPA parameter details.")
-        print("     Leave blank if you need to fetch the application from GitHub Releases.")
         user_ipa = input("👉 Enter local file path to 'xiCode.ipa' (or press Enter to visit GitHub): ").strip().strip('"')
         if not user_ipa:
-            print(f"[*] Dispatching system web portal hook to: {GITHUB_RELEASES_URL}")
             webbrowser.open(GITHUB_RELEASES_URL)
-            user_ipa = input("👉 Enter the local file path once downloaded from releases: ").strip().strip('"')
+            user_ipa = input("👉 Enter the local file path once downloaded: ").strip().strip('"')
         args.ipa = user_ipa
 
     using_xip = False
     if not args.sdk:
         print("\n[💡] Missing SDK parameter details.")
-        print("    1. I already have a loose extracted 'iPhoneOS.sdk' folder library.")
-        print("    2. I have a clean, raw 'Xcode.xip' archive downloaded from Apple.")
-        choice = input("👉 Select your asset source configuration option (1 or 2): ").strip()
+        print("    1. I have an extracted 'iPhoneOS.sdk' folder.")
+        print("    2. I have a 'Xcode.xip' archive.")
+        choice = input("👉 Select option (1 or 2): ").strip()
         
         if choice == "2":
-            user_sdk = input("👉 Enter file path to 'Xcode.xip' (or press Enter to download via Apple): ").strip().strip('"')
+            user_sdk = input("👉 Path to 'Xcode.xip': ").strip().strip('"')
             if not user_sdk:
-                print(f"[*] Routing to official Apple Developer Downloads archive portal: {APPLE_DEV_URL}")
                 webbrowser.open(APPLE_DEV_URL)
-                user_sdk = input("👉 Enter the local path to 'Xcode.xip' once downloaded: ").strip().strip('"')
+                user_sdk = input("👉 Enter local path to 'Xcode.xip' once downloaded: ").strip().strip('"')
             using_xip = True
         else:
-            user_sdk = input("👉 Enter local file directory path to 'iPhoneOS.sdk': ").strip().strip('"')
+            user_sdk = input("👉 Path to 'iPhoneOS.sdk' folder: ").strip().strip('"')
         args.sdk = user_sdk
     elif args.sdk.lower().endswith('.xip'):
         using_xip = True
 
     if not args.ipa or not args.sdk:
-        print("\n[!] Target assets definition invalid or cancelled. Installer aborting.")
+        print("\n[!] Path invalid. Aborting.")
         sys.exit(1)
 
-    # --- Verification & Execution Execution Sequence ---
+    # --- Execution ---
     if not installer.verify_environment(needs_7z=using_xip):
         sys.exit(1)
     if not installer.check_device_connected():
@@ -202,24 +201,17 @@ def main():
     if using_xip:
         final_sdk_path = installer.extract_sdk_from_xip(args.sdk)
         if not final_sdk_path:
-            print("[!] Failed to obtain uncompressed SDK framework targets. Aborting pipeline.")
             sys.exit(1)
 
     print("\n==================================================")
     print("        🚀 STARTING SETUP MOUNT SEQUENCER         ")
     print("==================================================")
     
-    if not installer.install_base_ipa(args.ipa):
-        print("[!] Execution pipeline broken at step 1.")
-        sys.exit(1)
-        
-    if not installer.inject_sdk_folder(final_sdk_path):
-        print("[!] Execution pipeline broken at step 2.")
-        sys.exit(1)
-
-    print("\n==================================================")
-    print("   🎉 SUCCESS: xiCode Environment Online! 🎉")
-    print("==================================================")
+    if installer.install_base_ipa(args.ipa):
+        if installer.inject_sdk_folder(final_sdk_path):
+            print("\n==================================================")
+            print("   🎉 SUCCESS: xiCode Environment Online! 🎉")
+            print("==================================================")
 
 if __name__ == "__main__":
     main()
