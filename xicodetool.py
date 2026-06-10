@@ -8,7 +8,6 @@ import webbrowser
 # Target URLs for user guidance
 GITHUB_RELEASES_URL = "https://github.com/Chayce22315/xiCode/releases"
 APPLE_DEV_URL = "https://developer.apple.com/download/all/"
-ITUNES_URL = "https://support.apple.com/en-us/HT210384"
 
 # MSYS2 Pathing configuration
 MSYS2_BIN = r"C:\msys64\ucrt64\bin"
@@ -21,10 +20,9 @@ class XiCodeInstaller:
         self.bundle_id = "com.pixelatedstudios.xiCode"
         self.bin_dirs = [MSYS2_BIN] if os.path.exists(MSYS2_BIN) else []
         
-        # Mapped directly to the actual executables shipped in the MSYS2 libimobiledevice pack
+        # WE REMOVED afcclient HERE - it's no longer required!
         self.tools = {
             "ideviceinstaller": ["ideviceinstaller"],
-            "afcclient": ["libimobiledevice-afcclient", "afcclient"],
             "idevice_id": ["idevice_id"]
         }
         
@@ -41,13 +39,11 @@ class XiCodeInstaller:
         for key, variants in self.tools.items():
             found_path = None
             for variant in variants:
-                # Check target MSYS2 location
                 for d in self.bin_dirs:
                     p = os.path.join(d, f"{variant}.exe")
                     if os.path.exists(p):
                         found_path = p
                         break
-                # Check general system path fallback
                 if not found_path:
                     found_path = shutil.which(variant) or shutil.which(f"{variant}.exe")
                 if found_path:
@@ -58,7 +54,7 @@ class XiCodeInstaller:
         """Validates found properties and outputs clean setup layouts."""
         clear_terminal()
         print("==================================================")
-        print("   XiCode Tool v2.6 - System Environment Check   ")
+        print("   XiCode Tool v2.7 - Optimized Pipeline Check   ")
         print("==================================================")
         print("[*] Inspecting dependencies...")
         
@@ -136,11 +132,11 @@ class XiCodeInstaller:
             return False
 
     def inject_sdk_folder(self, sdk_path):
-        print(f"\n[*] Step 2/2: Injecting SDK directory into sandboxed vault...")
+        print(f"\n[*] Step 2/2: Injecting SDK directory via App Documents share...")
         try:
-            tool_path = self.paths["afcclient"]
-            # Call the native libimobiledevice afc client transfer interface
-            cmd = [tool_path, "put", sdk_path, "/"]
+            # Using ideviceinstaller's native document upload capabilities directly
+            # Syntax: ideviceinstaller --bundle <id> --upload <local_file>
+            cmd = [self.paths["ideviceinstaller"], "--bundle", self.bundle_id, "--upload", sdk_path]
             result = subprocess.run(cmd, capture_output=True, text=True)
             return result.returncode == 0
         except Exception as e:
