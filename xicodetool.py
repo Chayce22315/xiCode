@@ -6,28 +6,41 @@ import argparse
 import webbrowser
 
 # Target URLs for user guidance
-LIBIMOBILE_URL = "https://github.com/libimobiledevice-win32/libimobiledevice-win32/releases"
-ITUNES_URL = "https://support.apple.com/en-us/HT210384"
-GITHUB_RELEASES_URL = "https://github.com/yourusername/xiCode/releases"
+GITHUB_RELEASES_URL = "https://github.com/Chayce22315/xiCode/releases"
 APPLE_DEV_URL = "https://developer.apple.com/download/all/"
+ITUNES_URL = "https://support.apple.com/en-us/HT210384"
+
+# MSYS2 Pathing configuration
+MSYS2_BIN = r"C:\msys64\ucrt64\bin"
 
 def clear_terminal():
     os.system('cls' if os.name == 'nt' else 'clear')
 
 class XiCodeInstaller:
     def __init__(self):
-        self.bundle_id = "com.yourname.xiCode"
-        self.ideviceinstaller = shutil.which("ideviceinstaller")
-        self.afcclient = shutil.which("afcclient")
-        self.idevice_id = shutil.which("idevice_id")
+        self.bundle_id = "com.pixelatedstudios.xiCode"
+        # Prioritize MSYS2 local toolchain binaries, then check global PATH
+        self.bin_dirs = [MSYS2_BIN] if os.path.exists(MSYS2_BIN) else []
+        
+        self.ideviceinstaller = self._find_tool("ideviceinstaller")
+        self.afcclient = self._find_tool("afcclient")
+        self.idevice_id = self._find_tool("idevice_id")
         
         # Locate 7-Zip
         self.seven_zip = shutil.which("7z")
         if not self.seven_zip and os.path.exists(r"C:\Program Files\7-Zip\7z.exe"):
             self.seven_zip = r"C:\Program Files\7-Zip\7z.exe"
 
+    def _find_tool(self, name):
+        """Locates binary paths seamlessly across environments."""
+        for d in self.bin_dirs:
+            path = os.path.join(d, f"{name}.exe")
+            if os.path.exists(path): 
+                return path
+        return shutil.which(name)
+
     def verify_environment(self, needs_7z=False):
-        """Checks if required utilities live in the system PATH."""
+        """Checks if required utilities live locally or in system environments."""
         clear_terminal()
         print("==================================================")
         print("   XiCode Tool v2.5 - System Environment Check   ")
@@ -41,76 +54,18 @@ class XiCodeInstaller:
         if needs_7z and not self.seven_zip: missing.append("7-Zip")
 
         if missing:
-            return self.handle_missing_dependencies(missing, needs_7z)
+            print("\n==================================================")
+            print("     ⚠️  MISSING DEPENDENCIES DETECTED  ⚠️")
+            print("==================================================")
+            print("The following utilities are required to deploy to your iPhone:")
+            for item in missing_list:
+                print(f"  ❌ {item}")
+            print("-" * 50)
+            print(f"[!] Please run MSYS2 UCRT64 and install tools via pacman.")
+            return False
         
         print("[+] Environment check successful! All tools are ready.")
         return True
-
-    def handle_missing_dependencies(self, missing_list, needs_7z):
-        """Interactive rescue wizard for installing missing dependencies."""
-        print("\n==================================================")
-        print("     ⚠️  MISSING DEPENDENCIES DETECTED  ⚠️")
-        print("==================================================")
-        print("The following utilities are required to deploy to your iPhone:")
-        for item in missing_list:
-            print(f"  ❌ {item}")
-        print("--------------------------------------------------")
-
-        # Handle 7-Zip via winget
-        if "7-Zip" in missing_list:
-            print("\n[📦] 7-Zip is required to unwrap Apple .xip archives.")
-            choice = input("👉 Install 7-Zip automatically right now via Windows Winget? (y/n): ").strip().lower()
-            if choice == 'y':
-                print("[*] Requesting 7-Zip from Windows Package Manager (winget)...")
-                try:
-                    subprocess.run(["winget", "install", "-e", "--id", "7zip.7zip"], check=True)
-                    print("[+] 7-Zip successfully installed!")
-                    if os.path.exists(r"C:\Program Files\7-Zip\7z.exe"):
-                        self.seven_zip = r"C:\Program Files\7-Zip\7z.exe"
-                        missing_list.remove("7-Zip")
-                except Exception as e:
-                    print(f"[!] Auto-install failed: {e}. Please install 7-Zip manually.")
-
-        # Handle libimobiledevice package
-        ios_usb_missing = any(x in missing_list for x in ["ideviceinstaller", "afcclient", "idevice_id"])
-        if ios_usb_missing:
-            print("\n[📱] Your system is missing the 'libimobiledevice' iOS USB toolkit.")
-            choice = input("👉 Open the GitHub Releases page to download the Windows binaries? (y/n): ").strip().lower()
-            if choice == 'y':
-                print("[*] Opening browser...")
-                webbrowser.open(LIBIMOBILE_URL)
-                print("\n💡 HOW TO FIX IT:")
-                print("1. Download the latest release zip (e.g., libimobiledevice-win32-x64.zip).")
-                print("2. Extract it somewhere memorable (like C:\\libimobiledevice).")
-                print("3. Add that directory to your Windows System Environment PATH variables,")
-                print("   OR move this 'xicodetool.py' file directly inside that folder.")
-                input("\nPress Enter once you have set up the folder to re-scan...")
-
-            print("\n[🔒] Driver Check: If your device fails to link after this, ensure")
-            print("     official iTunes is installed so Windows loads Apple's Mobile USB drivers.")
-            if input("👉 Need the official iTunes download link? (y/n): ").strip().lower() == 'y':
-                webbrowser.open(ITUNES_URL)
-
-        print("\n[*] Refreshing environment layout status...")
-        self.ideviceinstaller = shutil.which("ideviceinstaller")
-        self.afcclient = shutil.which("afcclient")
-        self.idevice_id = shutil.which("idevice_id")
-        if not self.seven_zip and os.path.exists(r"C:\Program Files\7-Zip\7z.exe"):
-            self.seven_zip = r"C:\Program Files\7-Zip\7z.exe"
-
-        still_missing = []
-        if not self.ideviceinstaller: still_missing.append("ideviceinstaller")
-        if not self.afcclient: still_missing.append("afcclient")
-        if not self.idevice_id: still_missing.append("idevice_id")
-        if needs_7z and not self.seven_zip: still_missing.append("7-Zip")
-
-        if not still_missing:
-            print("[+] Brilliant! All missing linkages repaired successfully.")
-            return True
-        else:
-            print(f"[!] Unable to proceed. Missing dependencies remain: {', '.join(still_missing)}")
-            print("Please fix the environment constraints and run the script again.")
-            return False
 
     def check_device_connected(self):
         """Verifies an iOS device is connected and trusted over USB."""
@@ -202,7 +157,7 @@ def main():
 
     installer = XiCodeInstaller()
 
-    # --- Interactive Wizard Architecture ---
+    # --- Interactive Wizard Interface ---
     if not args.ipa:
         print("\n[💡] Missing IPA parameter details.")
         print("     Leave blank if you need to fetch the application from GitHub Releases.")
@@ -233,18 +188,16 @@ def main():
     elif args.sdk.lower().endswith('.xip'):
         using_xip = True
 
-    # Validate parameters aren't completely empty strings
     if not args.ipa or not args.sdk:
         print("\n[!] Target assets definition invalid or cancelled. Installer aborting.")
         sys.exit(1)
 
-    # --- Pipeline Execution Sequence ---
+    # --- Verification & Execution Execution Sequence ---
     if not installer.verify_environment(needs_7z=using_xip):
         sys.exit(1)
     if not installer.check_device_connected():
         sys.exit(1)
 
-    # Extract XIP if required
     final_sdk_path = args.sdk
     if using_xip:
         final_sdk_path = installer.extract_sdk_from_xip(args.sdk)
@@ -252,7 +205,6 @@ def main():
             print("[!] Failed to obtain uncompressed SDK framework targets. Aborting pipeline.")
             sys.exit(1)
 
-    # Execution Phase (Install IPA first, then inject documents assets)
     print("\n==================================================")
     print("        🚀 STARTING SETUP MOUNT SEQUENCER         ")
     print("==================================================")
@@ -268,9 +220,6 @@ def main():
     print("\n==================================================")
     print("   🎉 SUCCESS: xiCode Environment Online! 🎉")
     print("==================================================")
-    print("Deployment finished successfully. Your workspace parameters are fully loaded.")
-    print("You may safely detach the USB connection cable.")
-    print("==================================================\n")
 
 if __name__ == "__main__":
     main()
