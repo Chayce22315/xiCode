@@ -42,6 +42,14 @@ jobs:
         zip -r xiCode.ipa Payload
         echo "[+] Compiled artifact package created successfully."
 
+    # 💾 The Fallback Artifact Upload Step
+    - name: Upload IPA as Workflow Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: xiCode-Build-Artifact
+        path: xiCode.ipa
+        if-no-files-found: error
+
     - name: Deploy Compiled Binary Asset to GitHub Releases
       uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/tags/')
